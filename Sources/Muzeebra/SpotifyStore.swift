@@ -148,42 +148,7 @@ class SpotifyStore {
     // Mini Player Mode
     var isMiniPlayerMode: Bool = false
     
-    // Online Sync & Auth State
-    var onlineServerUrl: String = "http://localhost:3000" {
-        didSet {
-            UserDefaults.standard.set(onlineServerUrl, forKey: "muzeebra_online_server_url")
-        }
-    }
-    var onlineSyncEnabled: Bool = false {
-        didSet {
-            UserDefaults.standard.set(onlineSyncEnabled, forKey: "muzeebra_online_sync_enabled")
-        }
-    }
-    var jwtToken: String = "" {
-        didSet {
-            UserDefaults.standard.set(jwtToken, forKey: "muzeebra_jwt_token")
-        }
-    }
-    var onlineUserEmail: String = "" {
-        didSet {
-            UserDefaults.standard.set(onlineUserEmail, forKey: "muzeebra_online_user_email")
-        }
-    }
-    var isOnlineLoggedIn: Bool = false {
-        didSet {
-            UserDefaults.standard.set(isOnlineLoggedIn, forKey: "muzeebra_is_online_logged_in")
-            if isOnlineLoggedIn {
-                fetchOnlineAnalytics()
-            }
-        }
-    }
-    
-    // Online Analytics Data
-    var analyticsTotalPlays: Int = 0
-    var analyticsTopTracks: [AnalyticsTrack] = []
-    var analyticsTopArtists: [AnalyticsArtist] = []
-    var onlineWebModePlays: Int = 0
-    var onlineLocalModePlays: Int = 0
+
     
     // Performance Statistics
     var memoryUsage: UInt64 = 0
@@ -212,14 +177,6 @@ class SpotifyStore {
         self.enableFeatureVibeInsights = UserDefaults.standard.bool(forKey: "muzeebra_enable_feature_vibe_insights")
         self.enableFeatureSleepTimer = UserDefaults.standard.bool(forKey: "muzeebra_enable_feature_sleep_timer")
         self.enableFeatureMiniPlayer = UserDefaults.standard.bool(forKey: "muzeebra_enable_feature_mini_player")
-        
-        // Online Sync & Auth Settings
-        self.onlineServerUrl = UserDefaults.standard.string(forKey: "muzeebra_online_server_url") ?? "http://localhost:3000"
-        self.onlineSyncEnabled = UserDefaults.standard.bool(forKey: "muzeebra_online_sync_enabled")
-        self.jwtToken = UserDefaults.standard.string(forKey: "muzeebra_jwt_token") ?? ""
-        self.onlineUserEmail = UserDefaults.standard.string(forKey: "muzeebra_online_user_email") ?? ""
-        self.isOnlineLoggedIn = UserDefaults.standard.bool(forKey: "muzeebra_is_online_logged_in")
-        
         self.isLoggedIn = webService.isLoggedIn
         self.accessToken = webService.accessToken
         
@@ -227,11 +184,6 @@ class SpotifyStore {
         restartTimer()
         setupPerformanceMonitoring()
         refreshState()
-        
-        // Fetch stats if already logged in online
-        if isOnlineLoggedIn {
-            fetchOnlineAnalytics()
-        }
     }
     
     func restartTimer() {
@@ -512,173 +464,6 @@ class SpotifyStore {
             bands: eqBands,
             preamp: eqPreamp
         )
-    }
-    
-    // MARK: - Online Sync & Authentication Methods
-    
-    func registerOnlineUser(email: String, password: String, completion: @escaping (Bool, String?) -> Void) {
-        guard let url = URL(string: "\(onlineServerUrl)/api/auth/register") else {
-            completion(false, "Invalid Server URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: String] = ["email": email, "password": password]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async { completion(false, error.localizedDescription) }
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                DispatchQueue.main.async { completion(false, "No response from server") }
-                return
-            }
-            
-            if httpResponse.statusCode == 201 {
-                DispatchQueue.main.async { completion(true, nil) }
-            } else {
-                let errorMsg = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String ?? "Server error (\(httpResponse.statusCode))"
-                DispatchQueue.main.async { completion(false, errorMsg) }
-            }
-        }.resume()
-    }
-    
-    func loginOnlineUser(email: String, password: String, completion: @escaping (Bool, String?) -> Void) {
-        guard let url = URL(string: "\(onlineServerUrl)/api/auth/login") else {
-            completion(false, "Invalid Server URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: String] = ["email": email, "password": password]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-            if let error = error {
-                DispatchQueue.main.async { completion(false, error.localizedDescription) }
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                DispatchQueue.main.async { completion(false, "No response from server") }
-                return
-            }
-            
-            if httpResponse.statusCode == 200, let data = data {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let token = json["token"] as? String,
-                   let returnedEmail = json["email"] as? String {
-                    DispatchQueue.main.async {
-                        self.jwtToken = token
-                        self.onlineUserEmail = returnedEmail
-                        self.isOnlineLoggedIn = true
-                        completion(true, nil)
-                    }
-                } else {
-                    DispatchQueue.main.async { completion(false, "Failed to parse login token") }
-                }
-            } else {
-                let errorMsg = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String ?? "Server error (\(httpResponse.statusCode))"
-                DispatchQueue.main.async { completion(false, errorMsg) }
-            }
-        }.resume()
-    }
-    
-    func logoutOnlineUser() {
-        jwtToken = ""
-        onlineUserEmail = ""
-        isOnlineLoggedIn = false
-        analyticsTotalPlays = 0
-        analyticsTopTracks = []
-        analyticsTopArtists = []
-        onlineWebModePlays = 0
-        onlineLocalModePlays = 0
-        MuzeebraLogger.shared.log("Logged out from online sync server.")
-    }
-    
-    func syncPlaybackToBackend(trackName: String, artist: String, albumName: String, uri: String, mode: String) {
-        guard isOnlineLoggedIn && onlineSyncEnabled else { return }
-        guard let url = URL(string: "\(onlineServerUrl)/api/history") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(jwtToken)", forHTTPHeaderField: "Authorization")
-        
-        let body: [String: Any] = [
-            "trackName": trackName,
-            "artist": artist,
-            "albumName": albumName,
-            "spotifyUri": uri,
-            "mode": mode
-        ]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-            if let error = error {
-                MuzeebraLogger.shared.log("Failed to sync playback: \(error.localizedDescription)")
-                return
-            }
-            if let response = response as? HTTPURLResponse, response.statusCode == 201 {
-                MuzeebraLogger.shared.log("Successfully synced playback of '\(trackName)' to online server.")
-                self.fetchOnlineAnalytics()
-            }
-        }.resume()
-    }
-    
-    func fetchOnlineAnalytics() {
-        guard isOnlineLoggedIn else { return }
-        guard let url = URL(string: "\(onlineServerUrl)/api/analytics") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(jwtToken)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-            if let error = error {
-                MuzeebraLogger.shared.log("Failed to fetch analytics: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else { return }
-            
-            struct ResponseData: Codable {
-                let totalPlays: Int
-                let topTracks: [AnalyticsTrack]
-                let topArtists: [AnalyticsArtist]
-                let modeDistribution: ModeDist
-                
-                struct ModeDist: Codable {
-                    let local: Int
-                    let web: Int
-                }
-            }
-            
-            do {
-                let decoded = try JSONDecoder().decode(ResponseData.self, from: data)
-                DispatchQueue.main.async {
-                    self.analyticsTotalPlays = decoded.totalPlays
-                    self.analyticsTopTracks = decoded.topTracks
-                    self.analyticsTopArtists = decoded.topArtists
-                    self.onlineLocalModePlays = decoded.modeDistribution.local
-                    self.onlineWebModePlays = decoded.modeDistribution.web
-                }
-            } catch {
-                MuzeebraLogger.shared.log("Failed to decode analytics response: \(error.localizedDescription)")
-            }
-        }.resume()
     }
     
     // MARK: - Mini Player Mode Methods
@@ -1173,10 +958,6 @@ class SpotifyStore {
         fetchAudioFeatures(for: uri)
         
         appendToHistoryCSV(trackName: trackName, artist: artist, albumName: albumName, uri: uri)
-        
-        // Trigger online sync if enabled
-        let mode = isLocalMode ? "local" : "web"
-        syncPlaybackToBackend(trackName: trackName, artist: artist, albumName: albumName, uri: uri, mode: mode)
     }
     
     private func appendToHistoryCSV(trackName: String, artist: String, albumName: String, uri: String) {
@@ -2032,16 +1813,3 @@ struct SpotifyArtistDetails: Identifiable {
     let albums: [SpotifyAlbum]
 }
 
-struct AnalyticsTrack: Identifiable, Codable {
-    var id: String { uri }
-    let trackName: String
-    let artist: String
-    let playCount: Int
-    let uri: String
-}
-
-struct AnalyticsArtist: Identifiable, Codable {
-    var id: String { artist }
-    let artist: String
-    let playCount: Int
-}
