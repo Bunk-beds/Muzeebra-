@@ -1470,13 +1470,14 @@ struct EqualizerVisualizer: View {
     
     var body: some View {
         TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
-            MiniVisualizerView(store: store)
+            MiniVisualizerView(store: store, date: context.date)
         }
     }
 }
 
 struct MiniVisualizerView: View {
     var store: SpotifyStore
+    let date: Date
     
     var body: some View {
         let count = 6
@@ -1487,7 +1488,7 @@ struct MiniVisualizerView: View {
             ForEach(0..<count, id: \.self) { i in
                 let height: CGFloat = {
                     if store.isPlaying {
-                        let time = Date().timeIntervalSince1970
+                        let time = date.timeIntervalSince1970
                         let wave = sin(time * 20.0 + Double(i) * 1.5)
                         let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
                         let base = CGFloat(10 + i * 2)
@@ -4239,13 +4240,14 @@ struct NowPlayingBannerEqualizer: View {
     
     var body: some View {
         TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
-            EqualizerWaveView(store: store)
+            EqualizerWaveView(store: store, date: context.date)
         }
     }
 }
 
 struct EqualizerWaveView: View {
     var store: SpotifyStore
+    let date: Date
     
     var body: some View {
         let count = 40
@@ -4261,7 +4263,7 @@ struct EqualizerWaveView: View {
                 
                 let height: CGFloat = {
                     if store.isPlaying {
-                        let time = Date().timeIntervalSince1970
+                        let time = date.timeIntervalSince1970
                         let wave = sin(time * 15.0 + Double(i) * 0.8) * cos(time * 8.0 - Double(i) * 0.3)
                         let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
                         let modulated = baseHeight * (1.0 + wave * 0.4 * energyFactor) * noise * energyFactor
