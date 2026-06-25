@@ -252,6 +252,7 @@ struct DesktopPlayerDashboardView: View {
             VStack(alignment: .leading, spacing: 28) {
                 // Featured Large Card (Now Playing Banner)
                 NowPlayingBannerCard(store: store)
+                    .padding(.bottom, 45)
                 
                 if !store.isLocalMode && SpotifyWebService.shared.isLoggedIn {
                     // Recommended for You (Vertical List)
@@ -603,6 +604,10 @@ struct NowPlayingBannerCard: View {
                             .lineLimit(1)
                     }
                 }
+                Spacer()
+                
+                NowPlayingBannerEqualizer(isPlaying: store.isPlaying)
+                    .padding(.trailing, 24)
                 
                 Spacer()
             }
@@ -4195,6 +4200,59 @@ struct ZebraBackgroundView: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+// MARK: - Now Playing Banner Equalizer
+
+struct NowPlayingBannerEqualizer: View {
+    let isPlaying: Bool
+    @State private var heights: [CGFloat] = Array(repeating: 5, count: 40)
+    let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(0..<40, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(
+                        LinearGradient(
+                            colors: [.winampOrange, .winampRed],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: heights[i])
+                    .opacity(0.85)
+            }
+        }
+        .frame(height: 70)
+        .onAppear {
+            updateHeights(animate: false)
+        }
+        .onReceive(timer) { _ in
+            updateHeights(animate: true)
+        }
+    }
+    
+    private func updateHeights(animate: Bool) {
+        let count = 40
+        withAnimation(animate ? .easeInOut(duration: 0.1) : .none) {
+            for i in 0..<count {
+                let x = Double(i) / Double(count - 1)
+                
+                // Form a beautiful two-peak envelope (twin peaks like in the mockup)
+                let peak1 = exp(-pow((x - 0.28), 2) / 0.04) * 60.0
+                let peak2 = exp(-pow((x - 0.72), 2) / 0.03) * 45.0
+                let baseHeight = max(peak1 + peak2, 4)
+                
+                if isPlaying {
+                    let noise = Double.random(in: 0.4...1.2)
+                    heights[i] = CGFloat(baseHeight * noise)
+                } else {
+                    heights[i] = CGFloat(baseHeight * 0.2)
+                }
+            }
+        }
     }
 }
 
