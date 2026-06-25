@@ -1,8 +1,8 @@
 import SwiftUI
 
 extension Color {
-    static let winampOrange = Color(red: 1.0, green: 0.28, blue: 0.12)
-    static let winampRed = Color(red: 1.0, green: 0.15, blue: 0.15)
+    static let winampOrange = Color(red: 1.0, green: 0.45, blue: 0.0)
+    static let winampRed = Color(red: 1.0, green: 0.28, blue: 0.0)
 }
 
 import AppKit
@@ -28,13 +28,7 @@ struct MenuBarView: View {
                     .zIndex(100)
             }
         }
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.08, green: 0.08, blue: 0.12), Color(red: 0.12, green: 0.11, blue: 0.18)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(ZebraBackgroundView())
         .colorScheme(.dark)
     }
 }
@@ -118,15 +112,7 @@ struct DesktopDashboardView: View {
                 // Column 1: Left Sidebar
                 VStack(alignment: .leading, spacing: 20) {
                     // Logo / Title
-                    Text("Muzeebra")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.winampOrange, .winampRed],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    ZebraLogoView()
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
                     
@@ -891,15 +877,7 @@ struct HeaderView: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            Text("Muzeebra")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.winampOrange, .winampRed],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+            ZebraLogoView()
                 .padding(.leading, 16)
             
             Spacer()
@@ -1408,13 +1386,7 @@ struct QueuePanelView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.08, green: 0.08, blue: 0.12), Color(red: 0.12, green: 0.11, blue: 0.18)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(Color.clear)
     }
 }
 
@@ -1477,7 +1449,7 @@ struct DevicesPopoverView: View {
             }
         }
         .frame(width: 200)
-        .background(Color(red: 0.1, green: 0.1, blue: 0.15))
+        .background(Color.black.opacity(0.15))
     }
 }
 
@@ -3780,13 +3752,7 @@ struct MiniPlayerView: View {
         }
         .padding(12)
         .frame(width: 320, height: 110)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.08, green: 0.08, blue: 0.12), Color(red: 0.12, green: 0.11, blue: 0.18)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(Color.clear)
     }
     
     private func formatTime(_ seconds: Int) -> String {
@@ -4126,6 +4092,109 @@ struct VibeMetricCard: View {
         .padding(8)
         .background(Color.white.opacity(0.02))
         .cornerRadius(6)
+    }
+}
+
+// MARK: - Zebra Logo & Theme Views
+
+struct ZebraIcon: View {
+    var body: some View {
+        Canvas { context, size in
+            // Draw zebra head outline
+            let path = Path { p in
+                p.move(to: CGPoint(x: size.width * 0.6, y: size.height * 0.1))
+                p.addLine(to: CGPoint(x: size.width * 0.7, y: 0))
+                p.addLine(to: CGPoint(x: size.width * 0.75, y: size.height * 0.15))
+                p.addLine(to: CGPoint(x: size.width * 0.9, y: size.height * 0.95))
+                p.addLine(to: CGPoint(x: size.width * 0.65, y: size.height * 0.95))
+                p.addQuadCurve(to: CGPoint(x: size.width * 0.45, y: size.height * 0.6),
+                               control: CGPoint(x: size.width * 0.55, y: size.height * 0.8))
+                p.addLine(to: CGPoint(x: size.width * 0.1, y: size.height * 0.5))
+                p.addQuadCurve(to: CGPoint(x: size.width * 0.15, y: size.height * 0.35),
+                               control: CGPoint(x: size.width * 0.05, y: size.height * 0.4))
+                p.addLine(to: CGPoint(x: size.width * 0.5, y: size.height * 0.25))
+                p.closeSubpath()
+            }
+            
+            context.clip(to: path)
+            context.fill(path, with: .color(.black))
+            
+            for i in 0...8 {
+                let yOffset = CGFloat(i) * (size.height / 7) - size.height * 0.2
+                var stripePath = Path()
+                stripePath.move(to: CGPoint(x: 0, y: yOffset))
+                stripePath.addLine(to: CGPoint(x: size.width, y: yOffset + size.height * 0.35))
+                stripePath.addLine(to: CGPoint(x: size.width, y: yOffset + size.height * 0.45))
+                stripePath.addLine(to: CGPoint(x: 0, y: yOffset + size.height * 0.1))
+                stripePath.closeSubpath()
+                context.fill(stripePath, with: .color(.winampOrange))
+            }
+            
+            let eye = Path(ellipseIn: CGRect(x: size.width * 0.45, y: size.height * 0.28, width: size.width * 0.1, height: size.height * 0.1))
+            context.fill(eye, with: .color(.white))
+        }
+    }
+}
+
+struct ZebraLogoView: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ZebraIcon()
+                .frame(width: 18, height: 18)
+                .foregroundColor(.winampOrange)
+                .shadow(color: .winampOrange.opacity(0.4), radius: 3)
+            
+            Text("Muzeebra")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.winampOrange, .winampRed],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .shadow(color: .winampOrange.opacity(0.15), radius: 2)
+        }
+    }
+}
+
+struct ZebraBackgroundView: View {
+    var body: some View {
+        Canvas { context, size in
+            // Base background
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(red: 0.07, green: 0.07, blue: 0.09)))
+            
+            // Draw dark wavy zebra stripes
+            let stripeColor = Color.white.opacity(0.015)
+            
+            for i in 0...12 {
+                let xStart = CGFloat(i) * (size.width / 10) - size.width * 0.1
+                var path = Path()
+                path.move(to: CGPoint(x: xStart, y: 0))
+                
+                path.addCurve(to: CGPoint(x: xStart + 50, y: size.height * 0.5),
+                              control1: CGPoint(x: xStart + 20, y: size.height * 0.2),
+                              control2: CGPoint(x: xStart - 20, y: size.height * 0.3))
+                              
+                path.addCurve(to: CGPoint(x: xStart - 30, y: size.height),
+                              control1: CGPoint(x: xStart + 80, y: size.height * 0.7),
+                              control2: CGPoint(x: xStart - 40, y: size.height * 0.85))
+                              
+                path.addLine(to: CGPoint(x: xStart - 5, y: size.height))
+                
+                path.addCurve(to: CGPoint(x: xStart + 75, y: size.height * 0.5),
+                              control1: CGPoint(x: xStart - 15, y: size.height * 0.85),
+                              control2: CGPoint(x: xStart + 105, y: size.height * 0.7))
+                              
+                path.addCurve(to: CGPoint(x: xStart + 25, y: 0),
+                              control1: CGPoint(x: xStart + 5, y: size.height * 0.3),
+                              control2: CGPoint(x: xStart + 45, y: size.height * 0.2))
+                              
+                path.closeSubpath()
+                context.fill(path, with: .color(stripeColor))
+            }
+        }
+        .ignoresSafeArea()
     }
 }
 
