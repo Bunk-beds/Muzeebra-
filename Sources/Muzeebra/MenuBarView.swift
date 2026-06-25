@@ -606,7 +606,7 @@ struct NowPlayingBannerCard: View {
                 }
                 Spacer()
                 
-                NowPlayingBannerEqualizer(isPlaying: store.isPlaying)
+                NowPlayingBannerEqualizer(store: store)
                     .padding(.trailing, 24)
                 
                 Spacer()
@@ -1065,7 +1065,7 @@ struct NowPlayingView: View {
                                         
                                         // Equalizer
                                         if !store.lowPowerMode {
-                                            EqualizerVisualizer(isPlaying: store.isPlaying)
+                                            EqualizerVisualizer(store: store)
                                         }
                                     }
                                     
@@ -1460,27 +1460,50 @@ struct DevicesPopoverView: View {
 
 // Equalizer Animated visualizer
 struct EqualizerVisualizer: View {
-    let isPlaying: Bool
-    @State private var heights: [CGFloat] = [10, 15, 8, 20, 12, 17]
-    let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
-
+    var store: SpotifyStore
+    
+    private var animationInterval: Double {
+        guard store.isPlaying else { return 1.0 }
+        let bpm = store.hasAudioFeatures ? store.tempo : 120.0
+        return max(0.06, min(0.25, 12.0 / bpm))
+    }
+    
     var body: some View {
+        TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
+            MiniVisualizerView(store: store)
+        }
+    }
+}
+
+struct MiniVisualizerView: View {
+    var store: SpotifyStore
+    
+    var body: some View {
+        let count = 6
+        let energyFactor = store.hasAudioFeatures ? (0.5 + store.energy * 0.8) : 1.0
+        let turbulence = store.hasAudioFeatures ? (1.3 - store.danceability) : 0.6
+        
         HStack(alignment: .bottom, spacing: 2) {
-            ForEach(0..<heights.count, id: \.self) { i in
+            ForEach(0..<count, id: \.self) { i in
+                let height: CGFloat = {
+                    if store.isPlaying {
+                        let time = Date().timeIntervalSince1970
+                        let wave = sin(time * 20.0 + Double(i) * 1.5)
+                        let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
+                        let base = CGFloat(10 + i * 2)
+                        let modulated = base * CGFloat(1.0 + wave * 0.3) * CGFloat(noise * energyFactor)
+                        return CGFloat(max(3, min(20, modulated)))
+                    } else {
+                        return 3
+                    }
+                }()
+                
                 RoundedRectangle(cornerRadius: 1)
                     .fill(LinearGradient(colors: [.winampOrange, .winampRed], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 2, height: isPlaying ? heights[i] : 3)
+                    .frame(width: 2, height: height)
             }
         }
         .frame(height: 20)
-        .onReceive(timer) { _ in
-            guard isPlaying else { return }
-            withAnimation(.easeInOut(duration: 0.15)) {
-                for i in 0..<heights.count {
-                    heights[i] = CGFloat.random(in: 3...20)
-                }
-            }
-        }
     }
 }
 
@@ -4206,13 +4229,48 @@ struct ZebraBackgroundView: View {
 // MARK: - Now Playing Banner Equalizer
 
 struct NowPlayingBannerEqualizer: View {
-    let isPlaying: Bool
-    @State private var heights: [CGFloat] = Array(repeating: 5, count: 40)
-    let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+    var store: SpotifyStore
+    
+    private var animationInterval: Double {
+        guard store.isPlaying else { return 1.0 }
+        let bpm = store.hasAudioFeatures ? store.tempo : 120.0
+        return max(0.05, min(0.25, 12.0 / bpm))
+    }
     
     var body: some View {
+        TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
+            EqualizerWaveView(store: store)
+        }
+    }
+}
+
+struct EqualizerWaveView: View {
+    var store: SpotifyStore
+    
+    var body: some View {
+        let count = 40
+        let energyFactor = store.hasAudioFeatures ? (0.4 + store.energy * 0.9) : 1.0
+        let turbulence = store.hasAudioFeatures ? (1.5 - store.danceability) : 0.5
+        
         HStack(alignment: .bottom, spacing: 3) {
-            ForEach(0..<40, id: \.self) { i in
+            ForEach(0..<count, id: \.self) { i in
+                let x = Double(i) / Double(count - 1)
+                let peak1 = exp(-pow((x - 0.28), 2) / 0.04) * 60.0
+                let peak2 = exp(-pow((x - 0.72), 2) / 0.03) * 45.0
+                let baseHeight = max(peak1 + peak2, 4)
+                
+                let height: CGFloat = {
+                    if store.isPlaying {
+                        let time = Date().timeIntervalSince1970
+                        let wave = sin(time * 15.0 + Double(i) * 0.8) * cos(time * 8.0 - Double(i) * 0.3)
+                        let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
+                        let modulated = baseHeight * (1.0 + wave * 0.4 * energyFactor) * noise * energyFactor
+                        return CGFloat(max(modulated, 3))
+                    } else {
+                        return CGFloat(baseHeight * 0.2)
+                    }
+                }()
+                
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(
                         LinearGradient(
@@ -4221,38 +4279,11 @@ struct NowPlayingBannerEqualizer: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 3, height: heights[i])
+                    .frame(width: 3, height: height)
                     .opacity(0.85)
             }
         }
         .frame(height: 70)
-        .onAppear {
-            updateHeights(animate: false)
-        }
-        .onReceive(timer) { _ in
-            updateHeights(animate: true)
-        }
-    }
-    
-    private func updateHeights(animate: Bool) {
-        let count = 40
-        withAnimation(animate ? .easeInOut(duration: 0.1) : .none) {
-            for i in 0..<count {
-                let x = Double(i) / Double(count - 1)
-                
-                // Form a beautiful two-peak envelope (twin peaks like in the mockup)
-                let peak1 = exp(-pow((x - 0.28), 2) / 0.04) * 60.0
-                let peak2 = exp(-pow((x - 0.72), 2) / 0.03) * 45.0
-                let baseHeight = max(peak1 + peak2, 4)
-                
-                if isPlaying {
-                    let noise = Double.random(in: 0.4...1.2)
-                    heights[i] = CGFloat(baseHeight * noise)
-                } else {
-                    heights[i] = CGFloat(baseHeight * 0.2)
-                }
-            }
-        }
     }
 }
 
