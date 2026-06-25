@@ -1,74 +1,95 @@
-# Muzeebra
+<p align="center">
+  <img src="Assets/banner.png" alt="Muzeebra Banner" width="800">
+</p>
 
-Muzeebra is an ultra-lightweight, high-performance native macOS application that functions as a lightweight Spotify client and playback controller. 
-
-By leveraging native macOS frameworks (Swift, SwiftUI, AppKit, WebKit, and Network), Muzeebra runs with a physical memory footprint of only **~15-30 MB of RAM** and near **0% idle CPU**—avoiding the heavy resource overhead of standard Electron-based wrappers.
-
----
-
-## Key Features
-
-1. **Zero-Configuration Local Mode:**
-   - Controls the official Spotify macOS desktop app directly using native AppleScript.
-   - Listens to system-wide distributed notifications (`com.spotify.client.PlaybackStateChanged`) for instantaneous state updates with zero polling overhead.
-   - Works fully offline and requires no Spotify login or API configuration.
-
-2. **Standalone Web Mode (Built-In Web Player):**
-   - Connects to the Spotify Web API for catalog searching, playlist browsing, and device management.
-   - **Runs independently of the official Spotify app:** Features a built-in background playback engine that acts as a standalone Spotify Connect output device.
-   - **Throttling Prevention:** The player runs inside a borderless, transparent **1x1 background `NSWindow`**. Because the window is technically "on screen" and active, macOS's window server does not suspend its JavaScript execution or audio processes (avoiding typical App Nap throttling seen in hidden `WKWebView` views).
-
-3. **Developer Settings & Portability:**
-   - Includes a custom Spotify Client ID override field in Settings. Anyone downloading this app can enter their own credentials.
-   - The OAuth redirect server spins up dynamically on local port `5073` and shuts down immediately after catching the authorization code.
-   - Fully portable with zero hardcoded file paths. Logs are automatically saved securely in standard macOS caches (`~/Library/Caches/muzeebra.log`).
-
-4. **Resource Monitor & Low Power Mode:**
-   - Features a collapsible performance footer displaying real-time physical memory (Resident Set Size via Mach system calls), API request counts, and CPU.
-   - **Low Power Mode:** Toggles to slow down background timers and disable equalizer animations, further reducing battery drain.
+<p align="center">
+  <a href="https://developer.apple.com/swift/"><img src="https://img.shields.io/badge/Language-Swift_5.9+-orange.svg?style=flat-square" alt="Swift"></a>
+  <a href="https://developer.apple.com/macos/"><img src="https://img.shields.io/badge/Platform-macOS_14.0+-black.svg?style=flat-square" alt="macOS"></a>
+  <a href="https://raw.githubusercontent.com/Bunk-beds/Muzeebra-/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License"></a>
+  <a href="https://github.com/Bunk-beds/Muzeebra-/releases"><img src="https://img.shields.io/badge/Memory_Footprint-15--30_MB-green.svg?style=flat-square" alt="Memory"></a>
+</p>
 
 ---
 
-## How to Build & Run
+**Muzeebra** is an ultra-lightweight, high-performance native macOS application that serves as a beautiful mini-player, visualizer, and controller for Spotify. 
 
-Muzeebra has **zero external dependencies** and compile targets.
+By leveraging native macOS frameworks (`Swift`, `SwiftUI`, `AppKit`, `WebKit`, and `Network`), Muzeebra runs with a physical memory footprint of only **~15-30 MB of RAM** and near **0% idle CPU**—completely avoiding the heavy resource overhead and battery drain of standard Electron-based web wrappers.
 
-### Prerequisites
-- macOS 14.0 or later
-- Xcode or Swift Command Line Tools
+---
 
-### Developer Compile & Launch
-We include helper scripts under `Scripts/` to compile, package, sign, and run the app bundle on your Mac:
+## ⚡ Key Highlights
+
+* **🎹 Aesthetic Winamp-style Graphic Equalizer:** Enjoy custom-rendered visual sound waves that react gracefully to your music playback, bringing back a classic desktop music feel.
+* **🔌 Zero-Configuration Local Mode:** Control the official Spotify macOS desktop app directly using native AppleScript. It listens to system-wide distributed notifications (`com.spotify.client.PlaybackStateChanged`) for instantaneous state updates with zero polling overhead. Works fully offline and requires no configuration.
+* **🌐 Standalone Web Mode (Built-In Web Player):** Connect to the Spotify Web API for catalog searching, playlist browsing, and queue management. It acts as an independent Spotify Connect playback receiver.
+* **💤 Integrated Sleep Timer:** Set a countdown to automatically pause your music, perfect for listening to lo-fi or ambient music as you fall asleep.
+* **📐 Anti-Throttling Web Engine:** Features a custom playback engine inside a borderless, transparent **1x1 background `NSWindow`**. Because the window is technically active, macOS's window server does not suspend its JavaScript or audio processes (avoiding the common "App Nap" audio stuttering seen in hidden web views).
+* **🔋 Battery-Saving Low Power Mode:** Toggles background tick rates and disables visual animation cycles to preserve battery life when your MacBook is unplugged.
+* **📊 Mach-Level Resource Monitor:** Collapsible footer displaying real-time physical memory usage (Resident Set Size via Mach system kernel calls), CPU percentage, and API request counters.
+
+---
+
+## 📦 How to Install & Run
+
+You can run Muzeebra directly by installing the packaged disk image or building it from source.
+
+### Option 1: Fast Install (Recommended)
+1. Download the latest release: **[Muzeebra.dmg](Muzeebra.dmg)** (located in the repository root).
+2. Open the `.dmg` file and drag **Muzeebra** into your **Applications** folder.
+3. Launch the app from Applications or Spotlight. 
+> [!NOTE]  
+> *Because Muzeebra controls the Spotify application, macOS will prompt you to grant AppleScript and Automation permissions on first launch. Click **Allow** to enable playback sync.*
+
+### Option 2: Build from Source
+If you are a developer, you can compile and package the app manually. Muzeebra has **zero external package dependencies**.
+
+**Prerequisites:**
+* macOS 14.0 or later
+* Xcode or Swift Command Line Tools
 
 ```bash
-# Build the binary, build the .app structure, codesign ad-hoc, and open it
+# Clone the repository
+git clone https://github.com/Bunk-beds/Muzeebra-.git
+cd Muzeebra-
+
+# Compile, build the .app structure, codesign, and launch it
 ./Scripts/compile_and_run.sh
 ```
 
 ---
 
-## Spotify API Dashboard Setup (For Web Mode)
+## ⚙️ Spotify API Dashboard Setup (For Web Mode)
 
-If you wish to use the standalone **Web Mode**, you will need a Spotify Developer Client ID.
+If you wish to use the standalone **Web Mode** (which plays music directly inside Muzeebra without needing the Spotify desktop app running):
 
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com) and create an app.
-2. Under your app settings, add the following **Redirect URI**:
-   `http://127.0.0.1:5073/callback`
-3. Copy your **Client ID**.
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com) and create a developer app.
+2. In the app settings, add the following **Redirect URI**:
+   ```
+   http://127.0.0.1:5073/callback
+   ```
+3. Copy your app's **Client ID**.
 4. In Muzeebra, open the **Settings tab**, expand **Advanced Options**, paste your Client ID, and click **Link Spotify Account** to authenticate.
+5. The OAuth authorization server spins up dynamically on local port `5073` and shuts down immediately after catching the redirect code, leaving zero background ports open.
 
 ---
 
-## Repository Structure
+## 📂 Repository Structure
 
-- `Package.swift` - SwiftPM Package manifest (v14 target target, 0 external dependencies).
-- `Sources/Muzeebra/`
-  - `MuzeebraApp.swift` - SwiftUI Application entry point.
-  - `SpotifyStore.swift` - Main `@Observable` state coordinator.
-  - `SpotifyLocalService.swift` - AppleScript executor for local control.
-  - `SpotifyWebService.swift` - OAuth handler and Web API client.
-  - `SpotifyWebPlayerWindowController.swift` - Manages the background 1x1 transparent playback window.
-  - `MenuBarView.swift` - Glassmorphic main window interface (Now Playing, Search, Settings, Performance Monitor).
-- `Scripts/`
-  - `package_app.sh` - Packages the compiled binary into a `.app` bundle, injects Info.plist entitlements, and signs it.
-  - `compile_and_run.sh` - Development script to clean, rebuild, package, and launch the application.
+* [Package.swift](Package.swift) — SwiftPM Package manifest (v14 target, 0 external dependencies).
+* [Sources/Muzeebra/](Sources/Muzeebra/)
+  * [MuzeebraApp.swift](Sources/Muzeebra/MuzeebraApp.swift) — SwiftUI Application entry point.
+  * [SpotifyStore.swift](Sources/Muzeebra/SpotifyStore.swift) — Main state coordinator and data engine.
+  * [SpotifyLocalService.swift](Sources/Muzeebra/SpotifyLocalService.swift) — AppleScript executor for local desktop control.
+  * [SpotifyWebService.swift](Sources/Muzeebra/SpotifyWebService.swift) — Web API and OAuth authorization server.
+  * [SpotifyWebPlayerWindowController.swift](Sources/Muzeebra/SpotifyWebPlayerWindowController.swift) — Manages the background 1x1 transparent window.
+  * [MenuBarView.swift](Sources/Muzeebra/MenuBarView.swift) — Glassmorphic main visual interface (Player, Search, settings, sleep timer, visualizer).
+* [Scripts/](Scripts/)
+  * [package_app.sh](Scripts/package_app.sh) — Packages the compiled binary into a `.app` bundle, injects Info.plist entitlements, and signs it.
+  * [create_dmg.sh](Scripts/create_dmg.sh) — Packs the compiled app into a drag-and-drop installer disk image.
+  * [compile_and_run.sh](Scripts/compile_and_run.sh) — Development script to clean, rebuild, package, and launch the application.
+
+---
+
+## 📄 License
+
+Muzeebra is open-source software licensed under the [MIT License](LICENSE).
