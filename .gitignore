@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Swift / Package Manager
+.build/
+Packages/
+Package.resolved
+/*.app
+/*.dmg
+tmp_dmg/
+/tmp_dmg/
+
+# Node.js Backend
+Backend/node_modules/
+Backend/database.sqlite
+Backend/.env
