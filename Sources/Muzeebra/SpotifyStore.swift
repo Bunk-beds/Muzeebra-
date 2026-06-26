@@ -894,11 +894,21 @@ class SpotifyStore {
                 self.activePlaylistDetails = cachedDetails
             }
             // Trigger background sync in case we own it and can fetch updates
-            webService.performRequest(endpoint: "/v1/playlists/\(id)/items?limit=50") { [weak self] result in
+            self.fetchAllPlaylistItems(playlistId: id) { [weak self] result in
                 guard let self = self else { return }
                 switch result {
-                case .success(let data):
-                    self.parseAndSavePlaylistItems(data: data, id: id, name: name, artworkUrl: artworkUrl, updateActiveDetails: true)
+                case .success(let tracks):
+                    let details = SpotifyPlaylistDetails(
+                        id: id,
+                        name: name,
+                        artworkUrl: artworkUrl,
+                        tracks: tracks
+                    )
+                    self.savePlaylistToCache(details: details)
+                    DispatchQueue.main.async {
+                        self.playlistAccessError = nil
+                        self.activePlaylistDetails = details
+                    }
                 case .failure(let error):
                     if let nsError = error as NSError?, nsError.code == 403 {
                         MuzeebraLogger.shared.log("Cache background sync returned 403. Attempting public embed scraping fallback for playlist \(id)")
@@ -910,7 +920,7 @@ class SpotifyStore {
         }
         
         // 2. Fallback to network request if not cached
-        webService.performRequest(endpoint: "/v1/playlists/\(id)/items?limit=50") { [weak self] result in
+        self.fetchAllPlaylistItems(playlistId: id) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .failure(let error):
@@ -930,8 +940,18 @@ class SpotifyStore {
                         )
                     }
                 }
-            case .success(let data):
-                self.parseAndSavePlaylistItems(data: data, id: id, name: name, artworkUrl: artworkUrl, updateActiveDetails: true)
+            case .success(let tracks):
+                let details = SpotifyPlaylistDetails(
+                    id: id,
+                    name: name,
+                    artworkUrl: artworkUrl,
+                    tracks: tracks
+                )
+                self.savePlaylistToCache(details: details)
+                DispatchQueue.main.async {
+                    self.playlistAccessError = nil
+                    self.activePlaylistDetails = details
+                }
             }
         }
     }
