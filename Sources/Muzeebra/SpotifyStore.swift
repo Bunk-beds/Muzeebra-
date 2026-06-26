@@ -145,6 +145,7 @@ class SpotifyStore {
     var hasAudioFeatures: Bool = false
     var isAudioFeaturesLoading: Bool = false
     var playlistAccessError: String? = nil
+    var exportStatus: String? = nil
     
     // Mini Player Mode
     var isMiniPlayerMode: Bool = false
@@ -956,6 +957,131 @@ class SpotifyStore {
                             artworkUrl: artworkUrl,
                             tracks: []
                         )
+                    }
+                }
+            }
+        }
+    }
+    
+    func fetchAllPlaylistItems(playlistId: String, offset: Int = 0, accumulated: [SpotifyTrack] = [], completion: @escaping (Result<[SpotifyTrack], Error>) -> Void) {
+        let endpoint = "/v1/playlists/\(playlistId)/items?limit=100&offset=\(offset)"
+        webService.performRequest(endpoint: endpoint) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let data):
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = json["items"] as? [[String: Any]],
+                       let total = json["total"] as? Int {
+                        let parsed = items.compactMap { item -> SpotifyTrack? in
+                            guard let t = item["track"] as? [String: Any] else { return nil }
+                            var albumArt = ""
+                            if let album = t["album"] as? [String: Any],
+                               let images = album["images"] as? [[String: Any]],
+                               let firstImg = images.first {
+                                albumArt = firstImg["url"] as? String ?? ""
+                            }
+                            let artistName = ((t["artists"] as? [[String: Any]])?.first?["name"] as? String) ?? "Unknown Artist"
+                            let artId = ((t["artists"] as? [[String: Any]])?.first?["id"] as? String)
+                            return SpotifyTrack(
+                                id: t["id"] as? String ?? "",
+                                uri: t["uri"] as? String ?? "",
+                                name: t["name"] as? String ?? "Unknown",
+                                artist: artistName,
+                                albumName: (t["album"] as? [String: Any])?["name"] as? String ?? "",
+                                artworkUrl: albumArt,
+                                durationMs: t["duration_ms"] as? Int ?? 0,
+                                artistId: artId
+                            )
+                        }
+                        let nextAccumulated = accumulated + parsed
+                        if nextAccumulated.count < total && !parsed.isEmpty {
+                            self.fetchAllPlaylistItems(playlistId: playlistId, offset: nextAccumulated.count, accumulated: nextAccumulated, completion: completion)
+                        } else {
+                            completion(.success(nextAccumulated))
+                        }
+                    } else {
+                        completion(.failure(NSError(domain: "Muzeebra", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON Structure"])))
+                    }
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    func exportPlaylistsToCSV() {
+        guard !isLocalMode && isLoggedIn else { return }
+        
+        DispatchQueue.main.async {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.title = "Choose Export Destination Folder"
+            panel.prompt = "Export Here"
+            
+            if panel.runModal() == .OK, let folderURL = panel.url {
+                self.exportStatus = "Exporting..."
+                
+                let playlistsToExport = self.playlists
+                if playlistsToExport.isEmpty {
+                    self.exportStatus = "No playlists found to export"
+                    return
+                }
+                
+                let group = DispatchGroup()
+                var successCount = 0
+                var failCount = 0
+                
+                for playlist in playlistsToExport {
+                    group.enter()
+                    self.fetchAllPlaylistItems(playlistId: playlist.id) { result in
+                        switch result {
+                        case .failure(let error):
+                            MuzeebraLogger.shared.log("Failed to fetch tracks for export of playlist \(playlist.name): \(error.localizedDescription)")
+                            failCount += 1
+                            group.leave()
+                        case .success(let tracks):
+                            var csvContent = "Track Name,Artist,Album,URI\n"
+                            
+                            let escapeCSVField: (String) -> String = { field in
+                                let escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
+                                return "\"\(escaped)\""
+                            }
+                            
+                            for track in tracks {
+                                let name = escapeCSVField(track.name)
+                                let artist = escapeCSVField(track.artist)
+                                let album = escapeCSVField(track.albumName)
+                                let uri = escapeCSVField(track.uri)
+                                csvContent += "\(name),\(artist),\(album),\(uri)\n"
+                            }
+                            
+                            let safeName = playlist.name
+                                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                                .joined(separator: "_")
+                            let fileURL = folderURL.appendingPathComponent("\(safeName).csv")
+                            
+                            do {
+                                try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
+                                successCount += 1
+                            } catch {
+                                MuzeebraLogger.shared.log("Failed to write CSV file for playlist \(playlist.name): \(error.localizedDescription)")
+                                failCount += 1
+                            }
+                            group.leave()
+                        }
+                    }
+                }
+                
+                group.notify(queue: .main) {
+                    if failCount > 0 {
+                        self.exportStatus = "Export completed: \(successCount) succeeded, \(failCount) failed"
+                    } else {
+                        self.exportStatus = "Successfully exported \(successCount) playlists!"
                     }
                 }
             }

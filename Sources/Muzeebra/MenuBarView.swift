@@ -2046,6 +2046,40 @@ struct ConnectionSettingsView: View {
                             }
                             .controlSize(.small)
                         }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.05))
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Button(action: {
+                                    store.exportPlaylistsToCSV()
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.system(size: 11))
+                                        Text("Export Playlists to CSV")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.black)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.winampOrange)
+                                    .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Spacer()
+                            }
+                            
+                            if let status = store.exportStatus {
+                                Text(status)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 2)
+                            }
+                        }
+                        .padding(.top, 4)
                     } else {
                         Button(action: {
                             isLoading = true
