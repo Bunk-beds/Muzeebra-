@@ -2804,22 +2804,21 @@ struct PlaylistsView: View {
                                             
                                             Spacer()
                                             
-                                            // Direct Play Button
-                                            Button(action: {
-                                                store.playContext(uri: "spotify:playlist:\(playlist.id)")
-                                            }) {
-                                                Image(systemName: "play.circle.fill")
-                                                    .font(.system(size: 18))
-                                                    .foregroundColor(.winampOrange)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .opacity(hoverPlaylistId == playlist.id ? 1 : 0)
+                                            // Direct Play Icon
+                                            Image(systemName: "play.circle.fill")
+                                                .font(.system(size: 18))
+                                                .foregroundColor(.winampOrange)
+                                                .opacity(hoverPlaylistId == playlist.id ? 1 : 0)
+                                                .contentShape(Rectangle())
+                                                .onTapGesture {
+                                                    store.playContext(uri: "spotify:playlist:\(playlist.id)")
+                                                }
                                         }
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .fill(hoverPlaylistId == playlist.id ? Color.white.opacity(0.06) : Color.clear)
+                                                .fill(hoverPlaylistId == playlist.id ? Color.white.opacity(0.06) : Color.white.opacity(0.001))
                                         )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
