@@ -144,6 +144,7 @@ class SpotifyStore {
     var acousticness: Double = 0.0
     var hasAudioFeatures: Bool = false
     var isAudioFeaturesLoading: Bool = false
+    var playlistAccessError: String? = nil
     
     // Mini Player Mode
     var isMiniPlayerMode: Bool = false
@@ -881,8 +882,27 @@ class SpotifyStore {
     
     func fetchPlaylistTracks(id: String, name: String, artworkUrl: String) {
         guard !isLocalMode && isLoggedIn else { return }
+        
+        DispatchQueue.main.async {
+            self.playlistAccessError = nil
+        }
+        
         webService.performRequest(endpoint: "/v1/playlists/\(id)/tracks?limit=50") { [weak self] result in
-            if case .success(let data) = result {
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                MuzeebraLogger.shared.log("Playlist tracks API request failed: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.playlistAccessError = error.localizedDescription
+                    // Still open the detailed view so the error screen is displayed
+                    self.activePlaylistDetails = SpotifyPlaylistDetails(
+                        id: id,
+                        name: name,
+                        artworkUrl: artworkUrl,
+                        tracks: []
+                    )
+                }
+            case .success(let data):
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let items = json["items"] as? [[String: Any]] {
@@ -908,15 +928,36 @@ class SpotifyStore {
                             )
                         }
                         DispatchQueue.main.async {
-                            self?.activePlaylistDetails = SpotifyPlaylistDetails(
+                            self.playlistAccessError = nil
+                            self.activePlaylistDetails = SpotifyPlaylistDetails(
                                 id: id,
                                 name: name,
                                 artworkUrl: artworkUrl,
                                 tracks: parsedTracks
                             )
                         }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.playlistAccessError = "Invalid JSON Structure"
+                            self.activePlaylistDetails = SpotifyPlaylistDetails(
+                                id: id,
+                                name: name,
+                                artworkUrl: artworkUrl,
+                                tracks: []
+                            )
+                        }
                     }
-                } catch {}
+                } catch {
+                    DispatchQueue.main.async {
+                        self.playlistAccessError = "JSON Parsing Error"
+                        self.activePlaylistDetails = SpotifyPlaylistDetails(
+                            id: id,
+                            name: name,
+                            artworkUrl: artworkUrl,
+                            tracks: []
+                        )
+                    }
+                }
             }
         }
     }

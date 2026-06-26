@@ -2558,7 +2558,44 @@ struct PlaylistDetailView: View {
             
             // Tracks ScrollView
             ScrollView {
-                if playlistDetails.tracks.isEmpty {
+                if let error = store.playlistAccessError {
+                    VStack(spacing: 16) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.winampOrange)
+                            .padding(.top, 40)
+                        
+                        Text("Private Playlist Access Required")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("This playlist requires additional permissions (like private access). Please go to Settings, Disconnect your account, and Log In again to authorize full playlist access.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Text("Details: \(error)")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.red.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button(action: {
+                            store.selectedTab = "settings"
+                        }) {
+                            Text("Go to Settings")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.winampOrange)
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 8)
+                    }
+                } else if playlistDetails.tracks.isEmpty {
                     VStack(spacing: 8) {
                         Text("No songs in this playlist")
                             .font(.system(size: 11, weight: .medium))
