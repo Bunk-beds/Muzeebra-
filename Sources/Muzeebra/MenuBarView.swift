@@ -630,12 +630,11 @@ struct NowPlayingBannerCard: View {
                             .lineLimit(1)
                     }
                 }
-                Spacer()
+                Spacer(minLength: 20)
                 
                 NowPlayingBannerEqualizer(store: store)
-                    .padding(.trailing, 24)
-                
-                Spacer()
+                    .frame(maxWidth: 480)
+                    .padding(.trailing, 8)
             }
             .padding(20)
         }
@@ -1535,9 +1534,7 @@ struct EqualizerVisualizer: View {
     var store: SpotifyStore
     
     private var animationInterval: Double {
-        guard store.isPlaying else { return 0.1 }
-        let bpm = store.hasAudioFeatures ? store.tempo : 120.0
-        return max(0.06, min(0.25, 12.0 / bpm))
+        return store.isPlaying ? 0.016 : 0.033
     }
     
     var body: some View {
@@ -1562,10 +1559,11 @@ struct MiniVisualizerView: View {
                 let height: CGFloat = {
                     let time = date.timeIntervalSince1970
                     if store.isPlaying {
-                        let wave = sin(time * 20.0 + Double(i) * 1.5)
-                        let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
+                        let wave = sin(time * 8.0 + Double(i) * 1.5)
+                        let noiseWave = sin(time * 15.0 + Double(i) * 3.1)
+                        let noise = 1.0 + noiseWave * 0.25 * turbulence
                         let base = CGFloat(10 + i * 2)
-                        let modulated = base * CGFloat(1.0 + wave * 0.3) * CGFloat(noise * energyFactor)
+                        let modulated = base * CGFloat(1.0 + wave * 0.35) * CGFloat(noise * energyFactor)
                         return CGFloat(max(3, min(20, modulated)))
                     } else {
                         let wave = sin(time * 2.5 + Double(i) * 0.5)
@@ -4378,44 +4376,72 @@ struct NowPlayingBannerEqualizer: View {
     var store: SpotifyStore
     
     private var animationInterval: Double {
-        guard store.isPlaying else { return 0.1 }
-        let bpm = store.hasAudioFeatures ? store.tempo : 120.0
-        return max(0.05, min(0.25, 12.0 / bpm))
+        return store.isPlaying ? 0.016 : 0.033
     }
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: animationInterval, paused: false)) { context in
-            EqualizerWaveView(store: store, date: context.date)
-                .id(context.date)
+        GeometryReader { geometry in
+            TimelineView(.animation(minimumInterval: animationInterval, paused: false)) { context in
+                EqualizerWaveView(store: store, date: context.date, width: geometry.size.width)
+                    .id(context.date)
+            }
         }
+        .frame(height: 70)
     }
 }
 
 struct EqualizerWaveView: View {
     var store: SpotifyStore
     let date: Date
+    let width: CGFloat
     
     var body: some View {
-        let count = 40
+        let barWidth: CGFloat = 3
+        let spacing: CGFloat = 3
+        let count = max(10, Int(width / (barWidth + spacing)))
+        
         let energyFactor = store.hasAudioFeatures ? (0.4 + store.energy * 0.9) : 1.0
         let turbulence = store.hasAudioFeatures ? (1.5 - store.danceability) : 0.5
         
-        HStack(alignment: .bottom, spacing: 3) {
+        // Calculate a unique song seed based on the title and artist
+        let songSeed: Double = {
+            let name = store.trackName + store.artist
+            var hash = 5381
+            for char in name.utf8 {
+                hash = ((hash << 5) &+ hash) &+ Int(char)
+            }
+            return Double(abs(hash) % 1000) / 1000.0
+        }()
+        
+        HStack(alignment: .bottom, spacing: spacing) {
             ForEach(0..<count, id: \.self) { i in
                 let x = Double(i) / Double(count - 1)
-                let peak1 = exp(-pow((x - 0.28), 2) / 0.04) * 60.0
-                let peak2 = exp(-pow((x - 0.72), 2) / 0.03) * 45.0
-                let baseHeight = max(peak1 + peak2, 4)
+                
+                // Shift peak centers based on the unique song seed
+                let center1 = 0.15 + songSeed * 0.2
+                let center2 = 0.55 + (1.0 - songSeed) * 0.25
+                let center3 = 0.35 + sin(songSeed * .pi) * 0.2
+                
+                let peak1 = exp(-pow((x - center1), 2) / 0.04) * 60.0
+                let peak2 = exp(-pow((x - center2), 2) / 0.03) * 45.0
+                let peak3 = exp(-pow((x - center3), 2) / 0.02) * (30.0 + songSeed * 20.0)
+                
+                let baseHeight = max(peak1 + peak2 + peak3, 4)
                 
                 let height: CGFloat = {
                     let time = date.timeIntervalSince1970
+                    let speedFactor = 1.0 + songSeed * 0.8
+                    let phaseShift = Double(i) * (0.6 + songSeed * 0.4)
+                    
                     if store.isPlaying {
-                        let wave = sin(time * 15.0 + Double(i) * 0.8) * cos(time * 8.0 - Double(i) * 0.3)
-                        let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
+                        let wave = sin(time * (12.0 * speedFactor) + phaseShift) *
+                                   cos(time * (6.0 * speedFactor) - phaseShift * 0.5)
+                        let noiseWave = sin(time * (22.0 * speedFactor) + Double(i) * 3.7)
+                        let noise = 1.0 + noiseWave * 0.25 * turbulence
                         let modulated = baseHeight * (1.0 + wave * 0.4 * energyFactor) * noise * energyFactor
                         return CGFloat(max(modulated, 3))
                     } else {
-                        let wave = sin(time * 2.0 + Double(i) * 0.15)
+                        let wave = sin(time * (1.8 * speedFactor) + phaseShift * 0.2)
                         let modulated = baseHeight * (0.2 + wave * 0.08)
                         return CGFloat(max(modulated, 3))
                     }
@@ -4429,11 +4455,11 @@ struct EqualizerWaveView: View {
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 3, height: height)
+                    .frame(width: barWidth, height: height)
                     .opacity(0.85)
             }
         }
-        .frame(height: 70)
+        .frame(width: width, height: 70)
     }
 }
 
