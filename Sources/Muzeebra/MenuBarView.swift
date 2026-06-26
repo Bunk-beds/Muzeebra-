@@ -1535,14 +1535,15 @@ struct EqualizerVisualizer: View {
     var store: SpotifyStore
     
     private var animationInterval: Double {
-        guard store.isPlaying else { return 1.0 }
+        guard store.isPlaying else { return 0.1 }
         let bpm = store.hasAudioFeatures ? store.tempo : 120.0
         return max(0.06, min(0.25, 12.0 / bpm))
     }
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: animationInterval, paused: false)) { context in
             MiniVisualizerView(store: store, date: context.date)
+                .id(context.date)
         }
     }
 }
@@ -1559,15 +1560,18 @@ struct MiniVisualizerView: View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(0..<count, id: \.self) { i in
                 let height: CGFloat = {
+                    let time = date.timeIntervalSince1970
                     if store.isPlaying {
-                        let time = date.timeIntervalSince1970
                         let wave = sin(time * 20.0 + Double(i) * 1.5)
                         let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
                         let base = CGFloat(10 + i * 2)
                         let modulated = base * CGFloat(1.0 + wave * 0.3) * CGFloat(noise * energyFactor)
                         return CGFloat(max(3, min(20, modulated)))
                     } else {
-                        return 3
+                        let wave = sin(time * 2.5 + Double(i) * 0.5)
+                        let base = CGFloat(8 + i)
+                        let modulated = base * CGFloat(1.0 + wave * 0.2)
+                        return CGFloat(max(3, min(15, modulated)))
                     }
                 }()
                 
@@ -4374,14 +4378,15 @@ struct NowPlayingBannerEqualizer: View {
     var store: SpotifyStore
     
     private var animationInterval: Double {
-        guard store.isPlaying else { return 1.0 }
+        guard store.isPlaying else { return 0.1 }
         let bpm = store.hasAudioFeatures ? store.tempo : 120.0
         return max(0.05, min(0.25, 12.0 / bpm))
     }
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: animationInterval, paused: !store.isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: animationInterval, paused: false)) { context in
             EqualizerWaveView(store: store, date: context.date)
+                .id(context.date)
         }
     }
 }
@@ -4403,14 +4408,16 @@ struct EqualizerWaveView: View {
                 let baseHeight = max(peak1 + peak2, 4)
                 
                 let height: CGFloat = {
+                    let time = date.timeIntervalSince1970
                     if store.isPlaying {
-                        let time = date.timeIntervalSince1970
                         let wave = sin(time * 15.0 + Double(i) * 0.8) * cos(time * 8.0 - Double(i) * 0.3)
                         let noise = Double.random(in: (1.0 - turbulence)...(1.0 + turbulence))
                         let modulated = baseHeight * (1.0 + wave * 0.4 * energyFactor) * noise * energyFactor
                         return CGFloat(max(modulated, 3))
                     } else {
-                        return CGFloat(baseHeight * 0.2)
+                        let wave = sin(time * 2.0 + Double(i) * 0.15)
+                        let modulated = baseHeight * (0.2 + wave * 0.08)
+                        return CGFloat(max(modulated, 3))
                     }
                 }()
                 
