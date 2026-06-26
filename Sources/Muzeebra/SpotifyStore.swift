@@ -921,6 +921,41 @@ class SpotifyStore {
         }
     }
     
+    func fetchAlbumTracks(id: String, name: String, artworkUrl: String) {
+        guard !isLocalMode && isLoggedIn else { return }
+        webService.performRequest(endpoint: "/v1/albums/\(id)/tracks?limit=50") { [weak self] result in
+            if case .success(let data) = result {
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let items = json["items"] as? [[String: Any]] {
+                        let parsedTracks = items.compactMap { item -> SpotifyTrack? in
+                            let artistName = ((item["artists"] as? [[String: Any]])?.first?["name"] as? String) ?? "Unknown Artist"
+                            let artId = ((item["artists"] as? [[String: Any]])?.first?["id"] as? String)
+                            return SpotifyTrack(
+                                id: item["id"] as? String ?? "",
+                                uri: item["uri"] as? String ?? "",
+                                name: item["name"] as? String ?? "Unknown",
+                                artist: artistName,
+                                albumName: name,
+                                artworkUrl: artworkUrl,
+                                durationMs: item["duration_ms"] as? Int ?? 0,
+                                artistId: artId
+                            )
+                        }
+                        DispatchQueue.main.async {
+                            self?.activePlaylistDetails = SpotifyPlaylistDetails(
+                                id: id,
+                                name: name,
+                                artworkUrl: artworkUrl,
+                                tracks: parsedTracks
+                            )
+                        }
+                    }
+                } catch {}
+            }
+        }
+    }
+    
     func addTrackToPlaylist(trackUri: String, playlistId: String) {
         guard !isLocalMode && isLoggedIn else { return }
         let body: [String: Any] = ["uris": [trackUri]]

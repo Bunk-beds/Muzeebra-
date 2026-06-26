@@ -354,6 +354,31 @@ struct DesktopPlayerDashboardView: View {
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(hoverTrackUri == track.uri ? Color.white.opacity(0.05) : Color.clear)
                                     )
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        store.playTrack(uri: track.uri)
+                                    }
+                                    .contextMenu {
+                                        Button(action: {
+                                            store.playTrack(uri: track.uri)
+                                        }) {
+                                            Label("Play Now", systemImage: "play.fill")
+                                        }
+                                        Button(action: {
+                                            store.addToQueue(uri: track.uri)
+                                        }) {
+                                            Label("Add to Queue", systemImage: "text.insert")
+                                        }
+                                        if !store.playlists.isEmpty {
+                                            Menu("Add to Playlist") {
+                                                ForEach(store.playlists) { playlist in
+                                                    Button(playlist.name) {
+                                                        store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     .onHover { isHovered in
                                         hoverTrackUri = isHovered ? track.uri : nil
                                     }
@@ -436,7 +461,8 @@ struct DesktopPlayerDashboardView: View {
                                 HStack(spacing: 16) {
                                     ForEach(store.newReleases) { album in
                                         Button(action: {
-                                            store.playContext(uri: album.uri)
+                                            store.fetchAlbumTracks(id: album.id, name: album.name, artworkUrl: album.artworkUrl)
+                                            store.selectedTab = "playlists"
                                         }) {
                                             VStack(alignment: .leading, spacing: 8) {
                                                 if !album.artworkUrl.isEmpty, let url = URL(string: album.artworkUrl) {
@@ -687,6 +713,27 @@ struct DesktopQueueView: View {
                                     .padding(.vertical, 4)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(action: {
+                                        store.playTrack(uri: track.uri)
+                                    }) {
+                                        Label("Play Now", systemImage: "play.fill")
+                                    }
+                                    Button(action: {
+                                        store.addToQueue(uri: track.uri)
+                                    }) {
+                                        Label("Add to Queue", systemImage: "text.insert")
+                                    }
+                                    if !store.playlists.isEmpty {
+                                        Menu("Add to Playlist") {
+                                            ForEach(store.playlists) { playlist in
+                                                Button(playlist.name) {
+                                                    store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1383,6 +1430,31 @@ struct QueuePanelView: View {
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        store.playTrack(uri: track.uri)
+                                    }
+                                    .contextMenu {
+                                        Button(action: {
+                                            store.playTrack(uri: track.uri)
+                                        }) {
+                                            Label("Play Now", systemImage: "play.fill")
+                                        }
+                                        Button(action: {
+                                            store.addToQueue(uri: track.uri)
+                                        }) {
+                                            Label("Add to Queue", systemImage: "text.insert")
+                                        }
+                                        if !store.playlists.isEmpty {
+                                            Menu("Add to Playlist") {
+                                                ForEach(store.playlists) { playlist in
+                                                    Button(playlist.name) {
+                                                        store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1620,6 +1692,27 @@ struct SearchView: View {
                                     .cornerRadius(8)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(action: {
+                                        store.playTrack(uri: track.uri)
+                                    }) {
+                                        Label("Play Now", systemImage: "play.fill")
+                                    }
+                                    Button(action: {
+                                        store.addToQueue(uri: track.uri)
+                                    }) {
+                                        Label("Add to Queue", systemImage: "text.insert")
+                                    }
+                                    if !store.playlists.isEmpty {
+                                        Menu("Add to Playlist") {
+                                            ForEach(store.playlists) { playlist in
+                                                Button(playlist.name) {
+                                                    store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 
                                 Menu {
                                     Button(action: {
@@ -2509,6 +2602,27 @@ struct PlaylistDetailView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(action: {
+                                    store.playTrack(uri: track.uri)
+                                }) {
+                                    Label("Play Now", systemImage: "play.fill")
+                                }
+                                Button(action: {
+                                    store.addToQueue(uri: track.uri)
+                                }) {
+                                    Label("Add to Queue", systemImage: "text.insert")
+                                }
+                                if !store.playlists.isEmpty {
+                                    Menu("Add to Playlist") {
+                                        ForEach(store.playlists) { playlist in
+                                            Button(playlist.name) {
+                                                store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             .onHover { isHovered in
                                 hoverTrackUri = isHovered ? track.uri : nil
                             }
@@ -2816,6 +2930,31 @@ struct PlaylistsView: View {
                                                     RoundedRectangle(cornerRadius: 6)
                                                         .fill(hoverTrackUri == track.uri ? Color.white.opacity(0.05) : Color.clear)
                                                 )
+                                                .contentShape(Rectangle())
+                                                .onTapGesture {
+                                                    store.playTrack(uri: track.uri)
+                                                }
+                                                .contextMenu {
+                                                    Button(action: {
+                                                        store.playTrack(uri: track.uri)
+                                                    }) {
+                                                        Label("Play Now", systemImage: "play.fill")
+                                                    }
+                                                    Button(action: {
+                                                        store.addToQueue(uri: track.uri)
+                                                    }) {
+                                                        Label("Add to Queue", systemImage: "text.insert")
+                                                    }
+                                                    if !store.playlists.isEmpty {
+                                                        Menu("Add to Playlist") {
+                                                            ForEach(store.playlists) { playlist in
+                                                                Button(playlist.name) {
+                                                                    store.addTrackToPlaylist(trackUri: track.uri, playlistId: playlist.id)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                                 .onHover { isHovered in
                                                     hoverTrackUri = isHovered ? track.uri : nil
                                                 }
@@ -2894,7 +3033,7 @@ struct PlaylistsView: View {
                                             HStack(spacing: 12) {
                                                 ForEach(store.newReleases) { album in
                                                     Button(action: {
-                                                        store.playContext(uri: album.uri)
+                                                        store.fetchAlbumTracks(id: album.id, name: album.name, artworkUrl: album.artworkUrl)
                                                     }) {
                                                         VStack(alignment: .leading, spacing: 6) {
                                                             if !album.artworkUrl.isEmpty, let url = URL(string: album.artworkUrl) {
@@ -3612,7 +3751,9 @@ struct ArtistDetailView: View {
                             HStack(spacing: 12) {
                                 ForEach(artistDetails.albums) { album in
                                     Button(action: {
-                                        store.playContext(uri: album.uri)
+                                        store.fetchAlbumTracks(id: album.id, name: album.name, artworkUrl: album.artworkUrl)
+                                        store.activeArtistDetails = nil
+                                        store.selectedTab = "playlists"
                                     }) {
                                         VStack(alignment: .leading, spacing: 6) {
                                             if !album.artworkUrl.isEmpty, let url = URL(string: album.artworkUrl) {
