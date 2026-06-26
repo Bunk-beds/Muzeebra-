@@ -340,6 +340,30 @@ class SpotifyWebService {
             }
         }
     }
+    
+    func fetchPublicPlaylistEmbed(id: String, completion: @escaping (Result<String, Error>) -> Void) {
+        let urlString = "https://open.spotify.com/embed/playlist/\(id)"
+        guard let url = URL(string: urlString) else {
+            completion(.failure(NSError(domain: "Muzeebra", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data, let html = String(data: data, encoding: .utf8) else {
+                completion(.failure(NSError(domain: "Muzeebra", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode HTML"])))
+                return
+            }
+            completion(.success(html))
+        }.resume()
+    }
 }
 
 class SpotifyCallbackServer {
