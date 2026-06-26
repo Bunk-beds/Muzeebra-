@@ -2565,15 +2565,16 @@ struct PlaylistDetailView: View {
                             .foregroundColor(.winampOrange)
                             .padding(.top, 40)
                         
-                        Text("Private Playlist Access Required")
+                        Text("Playlist Restricted or Private")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
                         
-                        Text("This playlist requires additional permissions (like private access). Please go to Settings, Disconnect your account, and Log In again to authorize full playlist access.")
+                        Text("Spotify restricts third-party apps from viewing track lists of playlists owned by other users (including Spotify's own featured playlists).\n\nIf you own this playlist, disconnect and log in again in Settings to authorize access. Otherwise, you can still play the entire playlist by clicking the Play button at the top!")
                             .font(.system(size: 11))
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
+                            .lineSpacing(3)
                         
                         Text("Details: \(error)")
                             .font(.system(size: 9, design: .monospaced))

@@ -887,7 +887,7 @@ class SpotifyStore {
             self.playlistAccessError = nil
         }
         
-        webService.performRequest(endpoint: "/v1/playlists/\(id)/tracks?limit=50") { [weak self] result in
+        webService.performRequest(endpoint: "/v1/playlists/\(id)/items?limit=50") { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .failure(let error):
