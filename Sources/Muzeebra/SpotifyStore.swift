@@ -888,6 +888,22 @@ class SpotifyStore {
             self.playlistAccessError = nil
         }
         
+        // 1. Check local JSON cache first
+        if let cachedDetails = loadPlaylistFromCache(id: id) {
+            DispatchQueue.main.async {
+                self.activePlaylistDetails = cachedDetails
+            }
+            // Trigger background sync in case we own it and can fetch updates
+            webService.performRequest(endpoint: "/v1/playlists/\(id)/items?limit=50") { [weak self] result in
+                guard let self = self else { return }
+                if case .success(let data) = result {
+                    self.parseAndSavePlaylistItems(data: data, id: id, name: name, artworkUrl: artworkUrl, updateActiveDetails: true)
+                }
+            }
+            return
+        }
+        
+        // 2. Fallback to network request if not cached
         webService.performRequest(endpoint: "/v1/playlists/\(id)/items?limit=50") { [weak self] result in
             guard let self = self else { return }
             switch result {
@@ -904,53 +920,56 @@ class SpotifyStore {
                     )
                 }
             case .success(let data):
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let items = json["items"] as? [[String: Any]] {
-                        let parsedTracks = items.compactMap { item -> SpotifyTrack? in
-                            guard let t = item["track"] as? [String: Any] else { return nil }
-                            var albumArt = ""
-                            if let album = t["album"] as? [String: Any],
-                               let images = album["images"] as? [[String: Any]],
-                               let firstImg = images.first {
-                                albumArt = firstImg["url"] as? String ?? ""
-                            }
-                            let artistName = ((t["artists"] as? [[String: Any]])?.first?["name"] as? String) ?? "Unknown Artist"
-                            let artId = ((t["artists"] as? [[String: Any]])?.first?["id"] as? String)
-                            return SpotifyTrack(
-                                id: t["id"] as? String ?? "",
-                                uri: t["uri"] as? String ?? "",
-                                name: t["name"] as? String ?? "Unknown",
-                                artist: artistName,
-                                albumName: (t["album"] as? [String: Any])?["name"] as? String ?? "",
-                                artworkUrl: albumArt,
-                                durationMs: t["duration_ms"] as? Int ?? 0,
-                                artistId: artId
-                            )
-                        }
-                        DispatchQueue.main.async {
-                            self.playlistAccessError = nil
-                            self.activePlaylistDetails = SpotifyPlaylistDetails(
-                                id: id,
-                                name: name,
-                                artworkUrl: artworkUrl,
-                                tracks: parsedTracks
-                            )
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            self.playlistAccessError = "Invalid JSON Structure"
-                            self.activePlaylistDetails = SpotifyPlaylistDetails(
-                                id: id,
-                                name: name,
-                                artworkUrl: artworkUrl,
-                                tracks: []
-                            )
-                        }
+                self.parseAndSavePlaylistItems(data: data, id: id, name: name, artworkUrl: artworkUrl, updateActiveDetails: true)
+            }
+        }
+    }
+    
+    private func parseAndSavePlaylistItems(data: Data, id: String, name: String, artworkUrl: String, updateActiveDetails: Bool) {
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let items = json["items"] as? [[String: Any]] {
+                let parsedTracks = items.compactMap { item -> SpotifyTrack? in
+                    guard let t = item["track"] as? [String: Any] else { return nil }
+                    var albumArt = ""
+                    if let album = t["album"] as? [String: Any],
+                       let images = album["images"] as? [[String: Any]],
+                       let firstImg = images.first {
+                        albumArt = firstImg["url"] as? String ?? ""
                     }
-                } catch {
+                    let artistName = ((t["artists"] as? [[String: Any]])?.first?["name"] as? String) ?? "Unknown Artist"
+                    let artId = ((t["artists"] as? [[String: Any]])?.first?["id"] as? String)
+                    return SpotifyTrack(
+                        id: t["id"] as? String ?? "",
+                        uri: t["uri"] as? String ?? "",
+                        name: t["name"] as? String ?? "Unknown",
+                        artist: artistName,
+                        albumName: (t["album"] as? [String: Any])?["name"] as? String ?? "",
+                        artworkUrl: albumArt,
+                        durationMs: t["duration_ms"] as? Int ?? 0,
+                        artistId: artId
+                    )
+                }
+                let details = SpotifyPlaylistDetails(
+                    id: id,
+                    name: name,
+                    artworkUrl: artworkUrl,
+                    tracks: parsedTracks
+                )
+                
+                // Save to local cache
+                savePlaylistToCache(details: details)
+                
+                if updateActiveDetails {
                     DispatchQueue.main.async {
-                        self.playlistAccessError = "JSON Parsing Error"
+                        self.playlistAccessError = nil
+                        self.activePlaylistDetails = details
+                    }
+                }
+            } else {
+                if updateActiveDetails {
+                    DispatchQueue.main.async {
+                        self.playlistAccessError = "Invalid JSON Structure"
                         self.activePlaylistDetails = SpotifyPlaylistDetails(
                             id: id,
                             name: name,
@@ -960,7 +979,131 @@ class SpotifyStore {
                     }
                 }
             }
+        } catch {
+            if updateActiveDetails {
+                DispatchQueue.main.async {
+                    self.playlistAccessError = "JSON Parsing Error"
+                    self.activePlaylistDetails = SpotifyPlaylistDetails(
+                        id: id,
+                        name: name,
+                        artworkUrl: artworkUrl,
+                        tracks: []
+                    )
+                }
+            }
         }
+    }
+    
+    private func getPlaylistCacheURL(id: String) -> URL? {
+        if let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            return cachesURL.appendingPathComponent("cached_playlist_\(id).json")
+        }
+        return nil
+    }
+    
+    private func savePlaylistToCache(details: SpotifyPlaylistDetails) {
+        guard let url = getPlaylistCacheURL(id: details.id) else { return }
+        do {
+            let data = try JSONEncoder().encode(details)
+            try data.write(to: url)
+            MuzeebraLogger.shared.log("[Cache] Saved playlist details for \(details.name) (\(details.id)) to cache.")
+        } catch {
+            MuzeebraLogger.shared.log("[Cache] Error saving playlist to cache: \(error.localizedDescription)")
+        }
+    }
+    
+    private func loadPlaylistFromCache(id: String) -> SpotifyPlaylistDetails? {
+        guard let url = getPlaylistCacheURL(id: id), FileManager.default.fileExists(atPath: url.path) else { return nil }
+        do {
+            let data = try Data(contentsOf: url)
+            let details = try JSONDecoder().decode(SpotifyPlaylistDetails.self, from: data)
+            MuzeebraLogger.shared.log("[Cache] Loaded playlist details for \(details.name) (\(id)) from cache.")
+            return details
+        } catch {
+            MuzeebraLogger.shared.log("[Cache] Error loading playlist from cache: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    private func parseDirectTrackObject(_ t: [String: Any]) -> SpotifyTrack? {
+        guard let id = t["id"] as? String, !id.isEmpty else { return nil }
+        var albumArt = ""
+        if let album = t["album"] as? [String: Any],
+           let images = album["images"] as? [[String: Any]],
+           let firstImg = images.first {
+            albumArt = firstImg["url"] as? String ?? ""
+        }
+        let artistName = ((t["artists"] as? [[String: Any]])?.first?["name"] as? String) ?? "Unknown Artist"
+        let artId = ((t["artists"] as? [[String: Any]])?.first?["id"] as? String)
+        return SpotifyTrack(
+            id: id,
+            uri: t["uri"] as? String ?? "",
+            name: t["name"] as? String ?? "Unknown",
+            artist: artistName,
+            albumName: (t["album"] as? [String: Any])?["name"] as? String ?? "",
+            artworkUrl: albumArt,
+            durationMs: t["duration_ms"] as? Int ?? 0,
+            artistId: artId
+        )
+    }
+    
+    func cachePlaylistTracksFromQueue(playlistId: String, playlistName: String, artworkUrl: String) {
+        guard !isLocalMode && isLoggedIn else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
+            
+            self.webService.performRequest(endpoint: "/v1/me/player/queue") { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .failure(let error):
+                    MuzeebraLogger.shared.log("[Queue Cache] Failed to fetch player queue: \(error.localizedDescription)")
+                case .success(let data):
+                    do {
+                        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            var tracksList: [SpotifyTrack] = []
+                            
+                            if let curTrack = json["currently_playing"] as? [String: Any],
+                               let parsedCur = self.parseDirectTrackObject(curTrack) {
+                                tracksList.append(parsedCur)
+                            }
+                            
+                            if let queueItems = json["queue"] as? [[String: Any]] {
+                                for item in queueItems {
+                                    if let parsedTrack = self.parseDirectTrackObject(item) {
+                                        tracksList.append(parsedTrack)
+                                    }
+                                }
+                            }
+                            
+                            guard !tracksList.isEmpty else { return }
+                            
+                            let details = SpotifyPlaylistDetails(
+                                id: playlistId,
+                                name: playlistName,
+                                artworkUrl: artworkUrl,
+                                tracks: tracksList
+                            )
+                            self.savePlaylistToCache(details: details)
+                            
+                            DispatchQueue.main.async {
+                                if self.activePlaylistDetails?.id == playlistId {
+                                    self.playlistAccessError = nil
+                                    self.activePlaylistDetails = details
+                                }
+                            }
+                        }
+                    } catch {
+                        MuzeebraLogger.shared.log("[Queue Cache] JSON parsing error: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+    
+    func playPlaylistAndCache(id: String, name: String, artworkUrl: String) {
+        playContext(uri: "spotify:playlist:\(id)")
+        cachePlaylistTracksFromQueue(playlistId: id, playlistName: name, artworkUrl: artworkUrl)
     }
     
     func fetchAllPlaylistItems(playlistId: String, offset: Int = 0, accumulated: [SpotifyTrack] = [], completion: @escaping (Result<[SpotifyTrack], Error>) -> Void) {
@@ -1966,7 +2109,7 @@ struct SpotifyDevice: Identifiable {
     let isActive: Bool
 }
 
-struct SpotifyTrack: Identifiable {
+struct SpotifyTrack: Identifiable, Codable {
     let id: String
     let uri: String
     let name: String
@@ -1984,7 +2127,7 @@ struct SpotifyPlaylist: Identifiable {
     let trackCount: Int
 }
 
-struct SpotifyPlaylistDetails: Identifiable {
+struct SpotifyPlaylistDetails: Identifiable, Codable {
     let id: String
     let name: String
     let artworkUrl: String

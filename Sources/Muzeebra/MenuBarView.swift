@@ -2570,7 +2570,7 @@ struct PlaylistDetailView: View {
                 
                 // Play Playlist Button
                 Button(action: {
-                    store.playContext(uri: "spotify:playlist:\(playlistDetails.id)")
+                    store.playPlaylistAndCache(id: playlistDetails.id, name: playlistDetails.name, artworkUrl: playlistDetails.artworkUrl)
                 }) {
                     ZStack {
                         Circle()
@@ -2883,7 +2883,7 @@ struct PlaylistsView: View {
                                                 .opacity(hoverPlaylistId == playlist.id ? 1 : 0)
                                                 .contentShape(Rectangle())
                                                 .onTapGesture {
-                                                    store.playContext(uri: "spotify:playlist:\(playlist.id)")
+                                                    store.playPlaylistAndCache(id: playlist.id, name: playlist.name, artworkUrl: playlist.artworkUrl)
                                                 }
                                         }
                                         .padding(.horizontal, 12)
