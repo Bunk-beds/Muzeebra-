@@ -1235,6 +1235,11 @@ class SpotifyStore {
                             
                             guard !tracksList.isEmpty else { return }
                             
+                            if let existing = self.loadPlaylistFromCache(id: playlistId), existing.tracks.count > tracksList.count {
+                                MuzeebraLogger.shared.log("[Queue Cache] Skipping cache overwrite because existing cache has \(existing.tracks.count) tracks which is > queue's \(tracksList.count) tracks.")
+                                return
+                            }
+                            
                             let details = SpotifyPlaylistDetails(
                                 id: playlistId,
                                 name: playlistName,
