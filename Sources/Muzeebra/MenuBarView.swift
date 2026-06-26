@@ -630,10 +630,10 @@ struct NowPlayingBannerCard: View {
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 20)
+                .frame(width: 250, alignment: .leading)
                 
                 NowPlayingBannerEqualizer(store: store)
-                    .frame(maxWidth: 480)
+                    .frame(maxWidth: .infinity)
                     .padding(.trailing, 8)
             }
             .padding(20)
@@ -4400,8 +4400,12 @@ struct EqualizerWaveView: View {
         let spacing: CGFloat = 3
         let count = max(10, Int(width / (barWidth + spacing)))
         
-        let energyFactor = store.hasAudioFeatures ? (0.4 + store.energy * 0.9) : 1.0
-        let turbulence = store.hasAudioFeatures ? (1.5 - store.danceability) : 0.5
+        let bpm = store.hasAudioFeatures && store.tempo > 30 ? store.tempo : 120.0
+        let energy = store.hasAudioFeatures ? store.energy : 0.7
+        let bps = bpm / 60.0
+        
+        let time = date.timeIntervalSince1970
+        let beatProgress = (time * bps).truncatingRemainder(dividingBy: 1.0)
         
         // Calculate a unique song seed based on the title and artist
         let songSeed: Double = {
@@ -4429,18 +4433,34 @@ struct EqualizerWaveView: View {
                 let baseHeight = max(peak1 + peak2 + peak3, 4)
                 
                 let height: CGFloat = {
-                    let time = date.timeIntervalSince1970
-                    let speedFactor = 1.0 + songSeed * 0.8
-                    let phaseShift = Double(i) * (0.6 + songSeed * 0.4)
-                    
                     if store.isPlaying {
-                        let wave = sin(time * (12.0 * speedFactor) + phaseShift) *
-                                   cos(time * (6.0 * speedFactor) - phaseShift * 0.5)
-                        let noiseWave = sin(time * (22.0 * speedFactor) + Double(i) * 3.7)
-                        let noise = 1.0 + noiseWave * 0.25 * turbulence
-                        let modulated = baseHeight * (1.0 + wave * 0.4 * energyFactor) * noise * energyFactor
-                        return CGFloat(max(modulated, 3))
+                        // Lows (Bass): x < 0.25 (Pulse on the beat)
+                        let lowPassTaper = max(0.0, 1.0 - (x / 0.25))
+                        let bassDecay = exp(-beatProgress / 0.12)
+                        let bassImpact = bassDecay * energy * 45.0
+                        let bassContribution = bassImpact * lowPassTaper
+                        
+                        // Highs (Treble): x > 0.7 (Subdivision jitter)
+                        let highPassTaper = max(0.0, (x - 0.7) / 0.3)
+                        let treblePhase = (beatProgress * 4.0).truncatingRemainder(dividingBy: 1.0)
+                        let trebleDecay = exp(-treblePhase / 0.08)
+                        let trebleImpact = trebleDecay * energy * 18.0 * Double.random(in: 0.8...1.2)
+                        let trebleContribution = trebleImpact * highPassTaper
+                        
+                        // Mids (Melody/Vocals): undulating waves
+                        let speedFactor = 1.0 + songSeed * 0.8
+                        let phaseShift = Double(i) * (0.6 + songSeed * 0.4)
+                        let midWave = sin(time * (8.0 * speedFactor) + phaseShift) *
+                                       cos(time * (4.0 * speedFactor) - phaseShift * 0.5)
+                        let midBase = baseHeight * (0.5 + energy * 0.5)
+                        let midContribution = midBase * (1.0 + midWave * 0.25) * (1.0 - lowPassTaper) * (1.0 - highPassTaper)
+                        
+                        let total = bassContribution + midContribution + trebleContribution
+                        return CGFloat(max(total, 3))
                     } else {
+                        // Slow standby ripple
+                        let speedFactor = 1.0 + songSeed * 0.8
+                        let phaseShift = Double(i) * (0.6 + songSeed * 0.4)
                         let wave = sin(time * (1.8 * speedFactor) + phaseShift * 0.2)
                         let modulated = baseHeight * (0.2 + wave * 0.08)
                         return CGFloat(max(modulated, 3))
