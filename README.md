@@ -45,7 +45,7 @@ If you are a developer, you can compile and package the app manually. Muzeebra h
 
 **Prerequisites:**
 * macOS 14.0 or later
-* Xcode or Swift Command Line Tools
+* **Xcode** (full installation; compiling Swift packages with standalone Command Line Tools may fail due to missing SDK frameworks like `SWBBuildService`)
 
 ```bash
 # Clone the repository
@@ -55,6 +55,13 @@ cd Muzeebra-
 # Compile, build the .app structure, codesign, and launch it
 ./Scripts/compile_and_run.sh
 ```
+
+> [!TIP]
+> **Troubleshooting `SWBBuildService` missing framework errors:**
+> If `swift build` fails with `Library not loaded: @rpath/SWBBuildService.framework/Versions/A/SWBBuildService`, ensure you have Xcode installed and set your developer path to it:
+> ```bash
+> sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+> ```
 
 ---
 

@@ -26,7 +26,28 @@ if [[ ${#ARCH_LIST[@]} -eq 0 ]]; then
 fi
 
 for ARCH in "${ARCH_LIST[@]}"; do
-  swift build -c "$CONF" --arch "$ARCH"
+  # Redirect stderr to a temp file to scan for dyld framework load errors
+  ERR_LOG=$(mktemp)
+  if ! swift build -c "$CONF" --arch "$ARCH" 2> "$ERR_LOG"; then
+    cat "$ERR_LOG" >&2
+    if grep -q "SWBBuildService" "$ERR_LOG"; then
+      echo "" >&2
+      echo "=========================================================================" >&2
+      echo "BUILD ERROR: Xcode framework 'SWBBuildService' could not be loaded." >&2
+      echo "This typically occurs when using standalone Xcode Command Line Tools" >&2
+      echo "instead of the full Xcode application developer directory." >&2
+      echo "-------------------------------------------------------------------------" >&2
+      echo "TO FIX THIS:" >&2
+      echo "1. Ensure you have the full Xcode application installed." >&2
+      echo "2. Set your active developer directory to Xcode using:" >&2
+      echo "   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer" >&2
+      echo "=========================================================================" >&2
+      echo "" >&2
+    fi
+    rm -f "$ERR_LOG"
+    exit 1
+  fi
+  rm -f "$ERR_LOG"
 done
 
 APP="$ROOT/${APP_NAME}.app"
