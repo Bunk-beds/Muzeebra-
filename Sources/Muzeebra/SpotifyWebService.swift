@@ -348,19 +348,23 @@ class SpotifyWebService {
             return
         }
         
+        MuzeebraLogger.shared.log("[Scraper] fetchPublicPlaylistEmbed calling \(urlString)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                MuzeebraLogger.shared.log("[Scraper] fetchPublicPlaylistEmbed network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             guard let data = data, let html = String(data: data, encoding: .utf8) else {
+                MuzeebraLogger.shared.log("[Scraper] fetchPublicPlaylistEmbed failed to decode HTML data")
                 completion(.failure(NSError(domain: "Muzeebra", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to decode HTML"])))
                 return
             }
+            MuzeebraLogger.shared.log("[Scraper] fetchPublicPlaylistEmbed successfully received \(html.count) chars of HTML")
             completion(.success(html))
         }.resume()
     }
